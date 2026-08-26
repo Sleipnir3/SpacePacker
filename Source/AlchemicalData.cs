@@ -1,35 +1,21 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Unity.Entities;
-using Unity.Mathematics;
-using UnityEngine;
 
-
-namespace GameWorld.ECS
+namespace SpacePacker
 {
     public enum Axis : byte
     {
         X = 0, Y = 1, Z = 2,
     }
 
-    // --- 1. ECS 组件定义  ---
-    [StructLayout(LayoutKind.Explicit, Size = 32)]
-    public struct EcsAlchemicalData : IComponentData
+    // --- 组件数据定义（显式内存布局，8 字节） ---
+    [StructLayout(LayoutKind.Explicit, Size = 8)]
+    public struct AlchemicalData
     {
-        private const uint mask = 0xFFFFF;
-
-        // StateSignature 覆盖 Position (0-7) 与 PackedData (8-11)
-        [FieldOffset(0)]
-        public uint4 StateSignature;
         [FieldOffset(0)]
         private ulong Position;
-        [FieldOffset(8)]
-        public uint _padding01;
-        [FieldOffset(12)]
-        private uint _padding02;
-        [FieldOffset(16)]
-        private uint4 _padding03;
 
+        private const uint mask = 0xFFFFF;
         /// <summary>
         /// 获取原始 64 位坐标镜像
         /// </summary>
