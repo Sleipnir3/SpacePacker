@@ -8,9 +8,11 @@ namespace SpacePacker
         X = 0, Y = 1, Z = 2,
     }
 
-    // --- 组件数据定义（显式内存布局，8 字节） ---
+    /// <summary>
+    /// 高密度坐标模板
+    /// </summary>
     [StructLayout(LayoutKind.Explicit, Size = 8)]
-    public struct AlchemicalData
+    public struct DensePosition
     {
         [FieldOffset(0)]
         private ulong Position;
@@ -24,7 +26,7 @@ namespace SpacePacker
 
         // --- 底层：位运算逻辑 (Raw Bitwise) ---
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public uint GetRawPos(Axis axis)
+        public uint GetSingleRawPos(Axis axis)
         {
             int offset = 20 * (int)axis;
             return (uint)((Position >> offset) & mask);

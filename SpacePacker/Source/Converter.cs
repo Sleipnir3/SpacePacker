@@ -29,10 +29,9 @@ namespace SpacePacker
     }
 
     /// <summary>
-    /// 压缩转换器 (Alchemical Converter)
-    /// 采用泛型配方模式，确保编译器（JIT/AOT）能够进行常量内联，实现零开销转换。
+    /// 转换器
     /// </summary>
-    public static class AlchemicalConverter
+    public static class Converter
     {
         // 20 位字段掩码
         private const uint FieldMask = 0xFFFFF;
