@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace SpacePacker.Test
 {
-    // 无符号模式测试配方
+    // 无符号模式测试配方（EnableSymbol 字段保留，但实现已强制有符号模式）
     public struct UnsignedRecipe : IAlchemicalRecipe
     {
         public readonly bool EnableSymbol => false;
@@ -61,17 +61,21 @@ namespace SpacePacker.Test
             float maxBack = Converter.ToFloat<DefaultPositionRecipe>(maxRaw);
             Console.WriteLine($"boundary: 524.287 -> 0x{maxRaw:X5} -> {maxBack}");
 
-            // === 无符号幅值模式 ===
+            // === 强制有符号模式（UnsignedRecipe 亦按符号-幅值处理） ===
 
-            // 6. 正值往返 + 负值拒绝 + 上限 1048.575
+            // 6. 保留字段不影响转换：UnsignedRecipe 与默认配方编解码一致
             float ux = 500.123f;
             uint uRaw = Converter.ToRaw<UnsignedRecipe>(ux);
             float uBack = Converter.ToFloat<UnsignedRecipe>(uRaw);
-            if (Math.Abs(uBack - ux) > 0.001f) { Console.WriteLine($"FAIL: unsigned round-trip {uBack}"); return 1; }
-            if (Converter.ToRaw<UnsignedRecipe>(-1f) != 0u) { Console.WriteLine("FAIL: unsigned should reject negative"); return 1; }
-            if (Converter.ToRaw<UnsignedRecipe>(1048.575f) == 0u) { Console.WriteLine("FAIL: unsigned max should be representable"); return 1; }
-            if (Converter.ToRaw<UnsignedRecipe>(1048.6f) != 0u) { Console.WriteLine("FAIL: unsigned overflow should collapse"); return 1; }
-            Console.WriteLine($"unsigned OK: {ux} -> 0x{uRaw:X5} -> {uBack}");
+            if (Math.Abs(uBack - ux) > 0.001f) { Console.WriteLine($"FAIL: forced-signed round-trip {uBack}"); return 1; }
+            if (uRaw != Converter.ToRaw<DefaultPositionRecipe>(ux)) { Console.WriteLine("FAIL: forced-signed encode mismatch"); return 1; }
+            // 负值不再被拒绝，而是按符号-幅值编码
+            uint uNeg = Converter.ToRaw<UnsignedRecipe>(-1.5f);
+            if ((uNeg & (1u << 19)) == 0 || (uNeg & 0x7FFFF) != 1500u) { Console.WriteLine("FAIL: forced-signed negative encode"); return 1; }
+            // 上限与有符号模式一致：±524.287
+            if (Converter.ToRaw<UnsignedRecipe>(524.287f) == 0u) { Console.WriteLine("FAIL: forced-signed max should be representable"); return 1; }
+            if (Converter.ToRaw<UnsignedRecipe>(524.4f) != 0u) { Console.WriteLine("FAIL: forced-signed overflow should collapse"); return 1; }
+            Console.WriteLine($"forced-signed OK: {ux} -> 0x{uRaw:X5} -> {uBack}");
 
             // === AlchemicalData 回归 ===
 

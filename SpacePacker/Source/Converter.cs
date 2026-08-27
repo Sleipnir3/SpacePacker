@@ -14,7 +14,9 @@ namespace SpacePacker
 
         /// <summary>
         /// true: (1+19) 符号-幅值模式（bit19=符号, bit0~18=幅值, 零点精确）；
-        /// false: 20 位无符号幅值模式（量程 [0, 2^20 × Step)）
+        /// false: 20 位无符号幅值模式（量程 [0, 2^20 × Step)）。
+        /// 注意：字段保留用于配方描述与兼容，当前实现强制只支持有符号模式，
+        /// 转换路径不再根据该字段分支。
         /// </summary>
         bool EnableSymbol { get; }
     }
@@ -54,16 +56,12 @@ namespace SpacePacker
             {
                 T recipe = default;
                 float scale = 1f / recipe.Step;
-                float maxRange = recipe.EnableSymbol
-                    ? MagnitudeMask * recipe.Step
-                    : FieldMask * recipe.Step;
-                string rangeDesc = recipe.EnableSymbol
-                    ? $"±{maxRange}"
-                    : $"0 ~ {maxRange}";
+                // 强制有符号模式：量程固定为符号-幅值模式的 ±(2^19-1) × Step
+                float maxRange = MagnitudeMask * recipe.Step;
                 System.Diagnostics.Debug.WriteLine(
                     $"[SpacePacker] Recipe<{typeof(T).Name}> 初始化: " +
-                    $"EnableSymbol={recipe.EnableSymbol}, Step={recipe.Step}, " +
-                    $"Scale={scale}, Range={rangeDesc}");
+                    $"EnableSymbol={recipe.EnableSymbol}(保留字段, 强制有符号), Step={recipe.Step}, " +
+                    $"Scale={scale}, Range=±{maxRange}");
                 return scale;
             }
         }
@@ -73,50 +71,33 @@ namespace SpacePacker
         /// <summary>
         /// 将浮点坐标量化为 20 位原始值。越界时返回 0（塌缩语义）。
         /// 量化采用四舍五入（+0.5 后截断），最大量化误差为半个步长。
+        /// 强制有符号模式：无分支直算 (1+19) 符号-幅值，避免 CPU 分支预测中断。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static uint ToRaw<T>(float value) where T : struct, IAlchemicalRecipe
         {
-            T recipe = default;
             float scale = RecipeCache<T>.Scale;
 
-            if (recipe.EnableSymbol)
-            {
-                // (1+19) 符号-幅值模式
-                float abs = value < 0f ? -value : value;
-                uint mag = (uint)(abs * scale + 0.5f);
-                if (mag > MagnitudeMask) return 0; // 越界塌缩
-                uint sign = value < 0f ? SignBit : 0u; // -0f 归一为 +0
-                return mag | sign;
-            }
-            else
-            {
-                // 20 位无符号幅值模式
-                if (value < 0f) return 0;
-                uint raw = (uint)(value * scale + 0.5f);
-                if (raw > FieldMask) return 0; // 越界塌缩
-                return raw;
-            }
+            // (1+19) 符号-幅值模式（固定路径，无符号分支已移除）
+            float abs = value < 0f ? -value : value;
+            uint mag = (uint)(abs * scale + 0.5f);
+            if (mag > MagnitudeMask) return 0; // 越界塌缩
+            uint sign = value < 0f ? SignBit : 0u; // -0f 归一为 +0
+            return mag | sign;
         }
 
         /// <summary>
         /// 将 20 位原始值还原为浮点坐标。
+        /// 强制有符号模式：无分支直算符号-幅值解码。
         /// </summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static float ToFloat<T>(uint rawValue) where T : struct, IAlchemicalRecipe
         {
             T recipe = default;
 
-            if (recipe.EnableSymbol)
-            {
-                // (1+19) 符号-幅值模式：解码直接乘 Step，往返精度最佳
-                float v = (rawValue & MagnitudeMask) * recipe.Step;
-                return (rawValue & SignBit) != 0 ? -v : v;
-            }
-            else
-            {
-                return rawValue * recipe.Step;
-            }
+            // (1+19) 符号-幅值模式（固定路径）：解码直接乘 Step，往返精度最佳
+            float v = (rawValue & MagnitudeMask) * recipe.Step;
+            return (rawValue & SignBit) != 0 ? -v : v;
         }
 
         /// <summary>
